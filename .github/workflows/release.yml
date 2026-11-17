@@ -1,0 +1,42 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  portable:
+    name: portable Windows exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}"
+          Compress-Archive -Path target/release/reminder.exe -DestinationPath "win-reminder-$ver-windows-x64.zip"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}"
+          $notes = "便携版，无需安装。`n`n下载 reminder.exe，或解压 zip 后直接运行。第一次启动会在程序旁边生成 config.toml。`n`n托盘菜单：立即休息、暂停 1 小时、跳过本次、退出。`n"
+          Set-Content -Encoding utf8 -Path notes.txt -Value $notes
+          gh release create $ver --title $ver --notes-file notes.txt `
+            "win-reminder-$ver-windows-x64.zip" `
+            "target/release/reminder.exe#reminder.exe"
